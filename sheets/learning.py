@@ -1,4 +1,6 @@
 import numpy as np
+import os
+from scipy.io import wavfile
 
 def soft_max(w):
     e = np.exp(np.clip(w, -500, 500))
@@ -82,3 +84,52 @@ class ReluNetwork(object):
             d_output[np.where(signals[-w_index])] = 0
             self.weights[-w_index - 1] -= self.learning_rate * np.dot(signals[-w_index - 1].T, d_output)
             self.biases[-w_index - 1]  -= self.learning_rate * d_output
+
+class SoundClassifier(object):
+    def __init__(self, data_set, frame_width = 3200, frame_jump = 100):
+        self.load_data(data_set, frame_width, frame_jump)
+        self.standardize_data()
+
+        self.model = LogisticNetwork((frame_width, int(frame_width / 4), self.data_buckets.shape[0]))
+
+    def standardize_data(self):
+        count = 0
+        total = 0
+        for x in self.data_buckets:
+            total += x.sum()
+            count += x.size
+        mean = total / float(count)
+
+        variance = 0
+        for x in self.data_buckets:
+            variance += ((x - mean) ** 2).sum()
+        variance /= float(count)
+
+        self.data_buckets -= mean
+        self.data_buckets /= variance ** 0.5
+
+    def load_data(self, data_set, frame_width, frame_jump):
+        self.classes = dict()
+        self.data_buckets = []
+        for x in os.listdir(data_set):
+            if not os.path.isdir(data_set + '/' + x):
+                continue
+
+            self.classes[x] = len(self.classes)
+            new_data = []
+            for y in os.listdir(data_set + '/' + x):
+                new_data.extend(SoundClassifier.load_examples(data_set + '/' + x + '/' + y, frame_width, frame_jump))
+            self.data_buckets.append(np.array(new_data))
+        self.data_buckets = np.array(self.data_buckets)
+
+    @staticmethod
+    def load_examples(path, frame_width, frame_jump):
+        examples = []
+        sample_rate, waveform = wavfile.read(path)
+        for channel_index in range(waveform.shape[1]):
+            channel = waveform[:, channel_index]
+            index = 0
+            while index + frame_width < len(channel):
+                examples.append(channel[index : index + frame_width])
+                index += frame_jump
+        return examples
