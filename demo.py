@@ -2,11 +2,9 @@ from sheets.learning import SoundClassifier
 import numpy as np
 from scipy.io import wavfile
 
-fs, data = wavfile.read('notes/a3/a3-1.wav')
-
 note_model = SoundClassifier('notes')
-# for x in note_model.data_buckets:
-# 	print(x.shape)
+# for x in note_model.classes:
+# 	print(x.ljust(3) + "  " + str(note_model.data_buckets[note_model.classes[x]].shape))
 
 print(note_model.accuracy_ratio())
 for epoch in range(1000):

@@ -65,7 +65,7 @@ class ReluNetwork(object):
 
         return soft_max(np.dot(j, self.weights[-1]) + self.biases[-1])
 
-    def train(self, inputs, targets):
+    def get_backprop_deltas(self, inputs, targets):
         if len(inputs.shape) == 2 and inputs[0] == 1:
             signals = [inputs]
         else:
@@ -77,14 +77,23 @@ class ReluNetwork(object):
         output = soft_max(np.dot(signals[-1], self.weights[-1]) + self.biases[-1])
 
         d_output = output - targets
-        self.weights[-1] -= self.learning_rate * np.dot(signals[-1].T, d_output)
-        self.biases[-1]  -= self.learning_rate * d_output
+        weight_deltas = [self.learning_rate * np.dot(signals[-1].T, d_output)]
+        bias_deltas = [self.learning_rate * d_output]
 
         for w_index in range(1, len(self.weights)):
             d_output = np.dot(d_output, self.weights[-w_index].T)
             d_output[np.where(signals[-w_index])] = 0
-            self.weights[-w_index - 1] -= self.learning_rate * np.dot(signals[-w_index - 1].T, d_output)
-            self.biases[-w_index - 1]  -= self.learning_rate * d_output
+            weight_deltas.append(self.learning_rate * np.dot(signals[-w_index - 1].T, d_output))
+            bias_deltas.append(self.learning_rate * d_output)
+        return (list(reversed(weight_deltas)), list(reversed(bias_deltas)))
+
+    def apply_deltas(self, deltas):
+        for x in range(len(self.weights)):
+            self.weights[x] -= deltas[0][x]
+            self.biases[x] -= deltas[1][x]
+
+    def train_backprop(self, inputs, targets):
+        self.apply_deltas(self.get_backprop_deltas(inputs, targets))
 
 class SoundClassifier(object):
     def __init__(self, data_set, frame_width = 1000, frame_jump = 100):
@@ -100,7 +109,7 @@ class SoundClassifier(object):
 
         example_data = self.data_buckets[class_index][random.randrange(0, self.data_buckets[class_index].shape[0])]
 
-        self.model.train(example_data, target_array)
+        self.model.train_backprop(example_data, target_array)
 
     def accuracy_ratio(self):
         correct = 0
