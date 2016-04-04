@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import random
 from scipy.io import wavfile
 
 def soft_max(w):
@@ -29,18 +30,18 @@ class LogisticNetwork(object):
     def calculate(self, inputs):
         signal = inputs
         for x in zip(self.weights, self.biases):
-            signal = vector_sigmoid(np.dot(signal, x[0]) + x[1])
+            signal = vector_sigmoid(np.dot(signal[-1], x[0]) + x[1])
         return signal
 
     def train(self, inputs, targets):
         signal = [inputs]
         for x in zip(self.weights, self.biases):
-            signal.append(vector_sigmoid(np.dot(signal, x[0]) + x[1]))
+            signal.append(vector_sigmoid(np.dot(signal[-1], x[0]) + x[1]))
 
         errors = []
-        errors.append(self.activation_derivative(signal[-1]) * (targets - signal[-1]))
+        errors.append(sigmoid_derivative(signal[-1]) * (targets - signal[-1]))
         for x in reversed(signal[1:-1]):
-            errors.append(errors[-1].sum() * self.activation_derivative(x))
+            errors.append(errors[-1].sum() * sigmoid_derivative(x))
         errors = reversed(errors)
 
 class ReluNetwork(object):
@@ -86,11 +87,31 @@ class ReluNetwork(object):
             self.biases[-w_index - 1]  -= self.learning_rate * d_output
 
 class SoundClassifier(object):
-    def __init__(self, data_set, frame_width = 3200, frame_jump = 100):
+    def __init__(self, data_set, frame_width = 1000, frame_jump = 100):
         self.load_data(data_set, frame_width, frame_jump)
         self.standardize_data()
 
-        self.model = LogisticNetwork((frame_width, int(frame_width / 4), self.data_buckets.shape[0]))
+        self.model = ReluNetwork((frame_width, int(frame_width / 5), self.data_buckets.shape[0]), rate = 0.0001)
+
+    def train_single(self):
+        class_index = random.randrange(0, self.data_buckets.shape[0])
+        target_array = np.zeros(self.data_buckets.shape[0])
+        target_array[class_index] = 1
+
+        example_data = self.data_buckets[class_index][random.randrange(0, self.data_buckets[class_index].shape[0])]
+
+        self.model.train(example_data, target_array)
+
+    def accuracy_ratio(self):
+        correct = 0
+        incorrect = 0
+        for target_class in range(self.data_buckets.shape[0]):
+            for example_data in self.data_buckets[target_class]:
+                if np.argmax(self.model.calculate(example_data)) == target_class:
+                    correct += 1
+                else:
+                    incorrect += 1
+        return correct / float(correct + incorrect)
 
     def standardize_data(self):
         count = 0
