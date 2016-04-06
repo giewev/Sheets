@@ -95,6 +95,18 @@ class ReluNetwork(object):
     def train_backprop(self, inputs, targets):
         self.apply_deltas(self.get_backprop_deltas(inputs, targets))
 
+    def train_backprop_batch(self, input_list, target_list):
+        deltas = None
+        for x in zip(input_list, target_list):
+            if deltas == None:
+                deltas = self.get_backprop_deltas(x[0], x[1])
+            else:
+                new_deltas = self.get_backprop_deltas(x[0], x[1])
+                for y in range(len(self.weights)):
+                    deltas[0][y] += new_deltas[0][y]
+                    deltas[1][y] += new_deltas[1][y]
+        self.apply_deltas(deltas)
+
 class SoundClassifier(object):
     def __init__(self, data_set, frame_width = 1000, frame_jump = 100):
         self.load_data(data_set, frame_width, frame_jump)
@@ -102,14 +114,18 @@ class SoundClassifier(object):
 
         self.model = ReluNetwork((frame_width, int(frame_width / 5), self.data_buckets.shape[0]), rate = 0.0001)
 
-    def train_single(self):
-        class_index = random.randrange(0, self.data_buckets.shape[0])
-        target_array = np.zeros(self.data_buckets.shape[0])
-        target_array[class_index] = 1
+    def train(self, batch_size = 1):
+        input_list = []
+        target_list = []
+        for x in range(batch_size):
+            class_index = random.randrange(0, self.data_buckets.shape[0])
+            target_array = np.zeros(self.data_buckets.shape[0])
+            target_array[class_index] = 1
+            example_data = self.data_buckets[class_index][random.randrange(0, self.data_buckets[class_index].shape[0])]
+            input_list.append(example_data)
+            target_list.append(target_array)
 
-        example_data = self.data_buckets[class_index][random.randrange(0, self.data_buckets[class_index].shape[0])]
-
-        self.model.train_backprop(example_data, target_array)
+        self.model.train_backprop_batch(input_list, target_list)
 
     def accuracy_ratio(self):
         correct = 0

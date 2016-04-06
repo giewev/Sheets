@@ -9,5 +9,5 @@ note_model = SoundClassifier('notes')
 print(note_model.accuracy_ratio())
 for epoch in range(1000):
 	for example in range(1000):
-		note_model.train_single()
+		note_model.train(10)
 	print(note_model.accuracy_ratio())
