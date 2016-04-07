@@ -82,7 +82,7 @@ class ReluNetwork(object):
 
         for w_index in range(1, len(self.weights)):
             d_output = np.dot(d_output, self.weights[-w_index].T)
-            d_output[np.where(signals[-w_index])] = 0
+            d_output[np.where(signals[-w_index] < 0)] = 0
             weight_deltas.append(self.learning_rate * np.dot(signals[-w_index - 1].T, d_output))
             bias_deltas.append(self.learning_rate * d_output)
         return (list(reversed(weight_deltas)), list(reversed(bias_deltas)))
