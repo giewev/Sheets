@@ -108,20 +108,21 @@ class ReluNetwork(object):
         self.apply_deltas(deltas)
 
 class SoundClassifier(object):
-    def __init__(self, data_set, frame_width = 1000, frame_jump = 100):
+    def __init__(self, data_set, frame_width = 1000, frame_jump = 100, test_ratio = 0.2):
+        self.test_ratio = test_ratio
         self.load_data(data_set, frame_width, frame_jump)
         self.standardize_data()
 
-        self.model = ReluNetwork((frame_width, int(frame_width / 5), self.data_buckets.shape[0]), rate = 0.0001)
+        self.model = ReluNetwork((frame_width, int(frame_width / 5), self.training_buckets.shape[0]), rate = 0.0001)
 
     def train(self, batch_size = 1):
         input_list = []
         target_list = []
         for x in range(batch_size):
-            class_index = random.randrange(0, self.data_buckets.shape[0])
-            target_array = np.zeros(self.data_buckets.shape[0])
+            class_index = random.randrange(0, self.training_buckets.shape[0])
+            target_array = np.zeros(self.training_buckets.shape[0])
             target_array[class_index] = 1
-            example_data = self.data_buckets[class_index][random.randrange(0, self.data_buckets[class_index].shape[0])]
+            example_data = self.training_buckets[class_index][random.randrange(0, self.training_buckets[class_index].shape[0])]
             input_list.append(example_data)
             target_list.append(target_array)
 
@@ -130,8 +131,8 @@ class SoundClassifier(object):
     def accuracy_ratio(self):
         correct = 0
         incorrect = 0
-        for target_class in range(self.data_buckets.shape[0]):
-            for example_data in self.data_buckets[target_class]:
+        for target_class in range(self.test_buckets.shape[0]):
+            for example_data in self.test_buckets[target_class]:
                 if np.argmax(self.model.calculate(example_data)) == target_class:
                     correct += 1
                 else:
@@ -141,22 +142,25 @@ class SoundClassifier(object):
     def standardize_data(self):
         count = 0
         total = 0
-        for x in self.data_buckets:
+        for x in self.training_buckets:
             total += x.sum()
             count += x.size
         mean = total / float(count)
 
         variance = 0
-        for x in self.data_buckets:
+        for x in self.training_buckets:
             variance += ((x - mean) ** 2).sum()
         variance /= float(count)
 
-        self.data_buckets -= mean
-        self.data_buckets /= variance ** 0.5
+        self.training_buckets -= mean
+        self.training_buckets /= variance ** 0.5
+        self.test_buckets -= mean
+        self.test_buckets /= variance ** 0.5
 
     def load_data(self, data_set, frame_width, frame_jump):
         self.classes = dict()
-        self.data_buckets = []
+        self.training_buckets = []
+        self.test_buckets = []
         for x in os.listdir(data_set):
             if not os.path.isdir(data_set + '/' + x):
                 continue
@@ -165,8 +169,13 @@ class SoundClassifier(object):
             new_data = []
             for y in os.listdir(data_set + '/' + x):
                 new_data.extend(SoundClassifier.load_examples(data_set + '/' + x + '/' + y, frame_width, frame_jump))
-            self.data_buckets.append(np.array(new_data))
-        self.data_buckets = np.array(self.data_buckets)
+            
+            random.shuffle(new_data)
+            test_data_count = int(len(new_data) * self.test_ratio)
+            self.training_buckets.append(np.array(new_data[test_data_count:]))
+            self.test_buckets.append(np.array(new_data[:test_data_count]))
+        self.training_buckets = np.array(self.training_buckets)
+        self.test_buckets = np.array(self.test_buckets)
 
     @staticmethod
     def load_examples(path, frame_width, frame_jump):
