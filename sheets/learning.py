@@ -40,6 +40,73 @@ sigmoid_activation = Activation(sigmoid, sigmoid_derivative, None)
 softmax_entropy_activation = Activation(softmax, None, softmax_entropy_derivative)
 sigmoid_square_activation = Activation(sigmoid, None, sigmoid_square_derivative)
 
+class NeuralNetwork(object):
+    def __init__(self, shape, activations = None, rate = 0.1):
+        self.weights = []
+        self.biases = []
+        self.learning_rate = rate
+
+        for x in zip(shape[:-1], shape[1:]):
+            self.weights.append(np.random.randn(x[0], x[1]))
+            self.biases.append(np.random.randn(1, x[1]))
+
+        if activations == None:
+            activations = [relu_activation] * (len(self.weights) - 1)
+            activations.append(softmax_entropy_activation)
+
+        self.activations = activations
+
+    def calculate(self, inputs):
+        if len(inputs.shape) == 2 and inputs[0] == 1:
+            j = inputs
+        else:
+            j = inputs.reshape((1, -1))
+
+        signal = inputs
+        for weight, bias, activate in zip(self.weights, self.biases, self.activations):
+            signal = activate(np.dot(signal[-1], weight) + bias)
+        return signal
+
+    def get_backprop_deltas(self, inputs, targets):
+        if len(inputs.shape) == 2 and inputs[0] == 1:
+            signals = [inputs]
+        else:
+            signals = [inputs.reshape((1, -1))]
+
+        for weight, bias, activate in zip(self.weights, self.biases, self.activations):
+            signals.append(activate(np.dot(signals[-1], weight) + bias))
+
+        d_output = self.activations[-1].backward_loss(signals[-1], targets)
+        weight_deltas = [self.learning_rate * np.dot(signals[-1].T, d_output)]
+        bias_deltas = [self.learning_rate * d_output]
+
+        for w_index in range(1, len(self.weights)):
+            d_output = np.dot(d_output, self.weights[-w_index].T)
+            d_output *= self.activations[-w_index].backward(signals[-w_index])
+            weight_deltas.append(self.learning_rate * np.dot(signals[-w_index - 1].T, d_output))
+            bias_deltas.append(self.learning_rate * d_output)
+        return (list(reversed(weight_deltas)), list(reversed(bias_deltas)))
+
+    def apply_deltas(self, deltas):
+        for x in range(len(self.weights)):
+            self.weights[x] -= deltas[0][x]
+            self.biases[x] -= deltas[1][x]
+
+    def train_backprop(self, inputs, targets):
+        self.apply_deltas(self.get_backprop_deltas(inputs, targets))
+
+    def train_backprop_batch(self, input_list, target_list):
+        deltas = None
+        for x in zip(input_list, target_list):
+            if deltas == None:
+                deltas = self.get_backprop_deltas(x[0], x[1])
+            else:
+                new_deltas = self.get_backprop_deltas(x[0], x[1])
+                for y in range(len(self.weights)):
+                    deltas[0][y] += new_deltas[0][y]
+                    deltas[1][y] += new_deltas[1][y]
+        self.apply_deltas(deltas)
+
 class LogisticNetwork(object):
     def __init__(self, shape, rate = 0.1):
         self.weights = []
