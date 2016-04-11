@@ -3,19 +3,42 @@ import os
 import random
 from scipy.io import wavfile
 
-def soft_max(w):
+def softmax(w):
     e = np.exp(np.clip(w, -500, 500))
     dist = e / np.sum(e)
     return dist
 
+def softmax_entropy_derivative(o, t):
+    return o - t
+
+def sigmoid_square_derivative(o, t):
+    return (t - o) * sigmoid_derivative(o)
+
 def relu(v):
     return v.clip(min=0)
 
-def vector_sigmoid(x):
+def relu_derivative(o):
+    d = np.ones(o.shape)
+    d[np.where(o < 0)] = 0
+
+    return d
+
+def sigmoid(x):
     return 1.0 / (1 + np.exp(-np.clip(x, -500, 500)))
 
 def sigmoid_derivative(x):
     return x * (1 - x)
+
+class Activation(object):
+    def __init__(self, forward, backward, backward_loss):
+        self.forward = forward
+        self.backward = backward
+        self.backward_loss = backward_loss
+
+relu_activation = Activation(relu, relu_derivative, None)
+sigmoid_activation = Activation(sigmoid, sigmoid_derivative, None)
+softmax_entropy_activation = Activation(softmax, None, softmax_entropy_derivative)
+sigmoid_square_activation = Activation(sigmoid, None, sigmoid_square_derivative)
 
 class LogisticNetwork(object):
     def __init__(self, shape, rate = 0.1):
@@ -30,13 +53,13 @@ class LogisticNetwork(object):
     def calculate(self, inputs):
         signal = inputs
         for x in zip(self.weights, self.biases):
-            signal = vector_sigmoid(np.dot(signal[-1], x[0]) + x[1])
+            signal = sigmoid(np.dot(signal[-1], x[0]) + x[1])
         return signal
 
     def train(self, inputs, targets):
         signal = [inputs]
         for x in zip(self.weights, self.biases):
-            signal.append(vector_sigmoid(np.dot(signal[-1], x[0]) + x[1]))
+            signal.append(sigmoid(np.dot(signal[-1], x[0]) + x[1]))
 
         errors = []
         errors.append(sigmoid_derivative(signal[-1]) * (targets - signal[-1]))
@@ -63,7 +86,7 @@ class ReluNetwork(object):
         for w,b in zip(self.weights[:-1], self.biases[:-1]):
             j = relu(np.dot(j, w) + b)
 
-        return soft_max(np.dot(j, self.weights[-1]) + self.biases[-1])
+        return softmax(np.dot(j, self.weights[-1]) + self.biases[-1])
 
     def get_backprop_deltas(self, inputs, targets):
         if len(inputs.shape) == 2 and inputs[0] == 1:
@@ -74,7 +97,7 @@ class ReluNetwork(object):
         for w,b in zip(self.weights[:-1], self.biases[:-1]):
             signals.append(relu(np.dot(signals[-1], w) + b))
 
-        output = soft_max(np.dot(signals[-1], self.weights[-1]) + self.biases[-1])
+        output = softmax(np.dot(signals[-1], self.weights[-1]) + self.biases[-1])
 
         d_output = output - targets
         weight_deltas = [self.learning_rate * np.dot(signals[-1].T, d_output)]
