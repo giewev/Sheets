@@ -107,95 +107,19 @@ class NeuralNetwork(object):
                     deltas[1][y] += new_deltas[1][y]
         self.apply_deltas(deltas)
 
-class LogisticNetwork(object):
+class LogisticNetwork(NeuralNetwork):
     def __init__(self, shape, rate = 0.1):
-        self.weights = []
-        self.biases = []
-        self.learning_rate = rate
+        activations = [sigmoid_activation] * len(shape) - 2
+        activations.append(sigmoid_square_activation)
 
-        for x in zip(shape[:-1], shape[1:]):
-            self.weights.append(np.random.randn(x[0], x[1]))
-            self.biases.append(np.random.randn(1, x[1]))
+        super(LogisticNetwork, self).__init__(shape, activations, rate)
 
-    def calculate(self, inputs):
-        signal = inputs
-        for x in zip(self.weights, self.biases):
-            signal = sigmoid(np.dot(signal[-1], x[0]) + x[1])
-        return signal
-
-    def train(self, inputs, targets):
-        signal = [inputs]
-        for x in zip(self.weights, self.biases):
-            signal.append(sigmoid(np.dot(signal[-1], x[0]) + x[1]))
-
-        errors = []
-        errors.append(sigmoid_derivative(signal[-1]) * (targets - signal[-1]))
-        for x in reversed(signal[1:-1]):
-            errors.append(errors[-1].sum() * sigmoid_derivative(x))
-        errors = reversed(errors)
-
-class ReluNetwork(object):
+class ReluNetwork(NeuralNetwork):
     def __init__(self, shape, rate = 0.1):
-        self.weights = []
-        self.biases = []
-        for x in zip(shape[:-1], shape[1:]):
-            self.weights.append(np.random.randn(x[0], x[1]))
-            self.biases.append(np.random.randn(1, x[1]))
-
-        self.learning_rate = rate
- 
-    def calculate(self, inputs):
-        if len(inputs.shape) == 2 and inputs[0] == 1:
-            j = inputs
-        else:
-            j = inputs.reshape((1, -1))
-
-        for w,b in zip(self.weights[:-1], self.biases[:-1]):
-            j = relu(np.dot(j, w) + b)
-
-        return softmax(np.dot(j, self.weights[-1]) + self.biases[-1])
-
-    def get_backprop_deltas(self, inputs, targets):
-        if len(inputs.shape) == 2 and inputs[0] == 1:
-            signals = [inputs]
-        else:
-            signals = [inputs.reshape((1, -1))]
-
-        for w,b in zip(self.weights[:-1], self.biases[:-1]):
-            signals.append(relu(np.dot(signals[-1], w) + b))
-
-        output = softmax(np.dot(signals[-1], self.weights[-1]) + self.biases[-1])
-
-        d_output = output - targets
-        weight_deltas = [self.learning_rate * np.dot(signals[-1].T, d_output)]
-        bias_deltas = [self.learning_rate * d_output]
-
-        for w_index in range(1, len(self.weights)):
-            d_output = np.dot(d_output, self.weights[-w_index].T)
-            d_output[np.where(signals[-w_index] < 0)] = 0
-            weight_deltas.append(self.learning_rate * np.dot(signals[-w_index - 1].T, d_output))
-            bias_deltas.append(self.learning_rate * d_output)
-        return (list(reversed(weight_deltas)), list(reversed(bias_deltas)))
-
-    def apply_deltas(self, deltas):
-        for x in range(len(self.weights)):
-            self.weights[x] -= deltas[0][x]
-            self.biases[x] -= deltas[1][x]
-
-    def train_backprop(self, inputs, targets):
-        self.apply_deltas(self.get_backprop_deltas(inputs, targets))
-
-    def train_backprop_batch(self, input_list, target_list):
-        deltas = None
-        for x in zip(input_list, target_list):
-            if deltas == None:
-                deltas = self.get_backprop_deltas(x[0], x[1])
-            else:
-                new_deltas = self.get_backprop_deltas(x[0], x[1])
-                for y in range(len(self.weights)):
-                    deltas[0][y] += new_deltas[0][y]
-                    deltas[1][y] += new_deltas[1][y]
-        self.apply_deltas(deltas)
+        activations = [relu_activation] * len(shape) - 2
+        activations.append(softmax_entropy_activation)
+        
+        super(ReluNetwork, self).__init__(shape, activations, rate)
 
 class SoundClassifier(object):
     def __init__(self, data_set, frame_width = 1000, frame_jump = 100, test_ratio = 0.2):
