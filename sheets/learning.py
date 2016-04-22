@@ -58,13 +58,12 @@ class NeuralNetwork(object):
 
     def calculate(self, inputs):
         if len(inputs.shape) == 2 and inputs[0] == 1:
-            j = inputs
+            signal = inputs
         else:
-            j = inputs.reshape((1, -1))
+            signal = inputs.reshape((1, -1))
 
-        signal = inputs
         for weight, bias, activate in zip(self.weights, self.biases, self.activations):
-            signal = activate.forward(np.dot(signal[-1], weight) + bias)
+            signal = activate.forward(np.dot(signal, weight) + bias)
         return signal
 
     def get_backprop_deltas(self, inputs, targets):
