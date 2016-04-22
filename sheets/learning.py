@@ -77,14 +77,15 @@ class NeuralNetwork(object):
             signals.append(activate.forward(np.dot(signals[-1], weight) + bias))
 
         d_output = self.activations[-1].backward_loss(signals[-1], targets)
-        weight_deltas = [self.learning_rate * np.dot(signals[-1].T, d_output)]
+        weight_deltas = [self.learning_rate * np.dot(signals[-2].T, d_output)]
         bias_deltas = [self.learning_rate * d_output]
 
         for w_index in range(1, len(self.weights)):
             d_output = np.dot(d_output, self.weights[-w_index].T)
-            d_output *= self.activations[-w_index].backward(signals[-w_index])
-            weight_deltas.append(self.learning_rate * np.dot(signals[-w_index - 1].T, d_output))
+            d_output *= self.activations[-w_index - 1].backward(signals[-w_index - 1])
+            weight_deltas.append(self.learning_rate * np.dot(signals[-w_index - 2].T, d_output))
             bias_deltas.append(self.learning_rate * d_output)
+
         return (list(reversed(weight_deltas)), list(reversed(bias_deltas)))
 
     def apply_deltas(self, deltas):
