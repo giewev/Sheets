@@ -64,7 +64,7 @@ class NeuralNetwork(object):
 
         signal = inputs
         for weight, bias, activate in zip(self.weights, self.biases, self.activations):
-            signal = activate(np.dot(signal[-1], weight) + bias)
+            signal = activate.forward(np.dot(signal[-1], weight) + bias)
         return signal
 
     def get_backprop_deltas(self, inputs, targets):
@@ -74,7 +74,7 @@ class NeuralNetwork(object):
             signals = [inputs.reshape((1, -1))]
 
         for weight, bias, activate in zip(self.weights, self.biases, self.activations):
-            signals.append(activate(np.dot(signals[-1], weight) + bias))
+            signals.append(activate.forward(np.dot(signals[-1], weight) + bias))
 
         d_output = self.activations[-1].backward_loss(signals[-1], targets)
         weight_deltas = [self.learning_rate * np.dot(signals[-1].T, d_output)]
@@ -109,14 +109,14 @@ class NeuralNetwork(object):
 
 class LogisticNetwork(NeuralNetwork):
     def __init__(self, shape, rate = 0.1):
-        activations = [sigmoid_activation] * len(shape) - 2
+        activations = [sigmoid_activation] * (len(shape) - 2)
         activations.append(sigmoid_square_activation)
 
         super(LogisticNetwork, self).__init__(shape, activations, rate)
 
 class ReluNetwork(NeuralNetwork):
     def __init__(self, shape, rate = 0.1):
-        activations = [relu_activation] * len(shape) - 2
+        activations = [relu_activation] * (len(shape) - 2)
         activations.append(softmax_entropy_activation)
         
         super(ReluNetwork, self).__init__(shape, activations, rate)
