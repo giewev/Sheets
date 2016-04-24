@@ -17,6 +17,11 @@ def vector_sigmoid(x):
 def sigmoid_derivative(x):
     return x * (1 - x)
 
+class DataPoint(object):
+    def __init__(self, inputs, targets):
+        self.inputs = inputs
+        self.targets = targets
+
 class LogisticNetwork(object):
     def __init__(self, shape, rate = 0.1):
         self.weights = []
@@ -109,6 +114,7 @@ class ReluNetwork(object):
 
 class SoundClassifier(object):
     def __init__(self, data_set, frame_width = 1000, frame_jump = 100, test_ratio = 0.2):
+        self.confidence_threshold = 0.75
         self.test_ratio = test_ratio
         self.load_data(data_set, frame_width, frame_jump)
         self.standardize_data()
@@ -131,8 +137,8 @@ class SoundClassifier(object):
     def accuracy_ratio(self):
         correct = 0
         incorrect = 0
-        for target_class in range(self.test_buckets.shape[0]):
-            for example_data in self.test_buckets[target_class]:
+        for target_class in range(self.test_data.shape[0]):
+            for example_data in self.test_data[target_class]:
                 if np.argmax(self.model.calculate(example_data)) == target_class:
                     correct += 1
                 else:
@@ -142,25 +148,25 @@ class SoundClassifier(object):
     def standardize_data(self):
         count = 0
         total = 0
-        for x in self.training_buckets:
-            total += x.sum()
-            count += x.size
+        for x in self.training_data:
+            total += x.inputs.sum()
+            count += x.inputs.size
         mean = total / float(count)
 
         variance = 0
-        for x in self.training_buckets:
-            variance += ((x - mean) ** 2).sum()
+        for x in self.training_data:
+            variance += ((x.inputs - mean) ** 2).sum()
         variance /= float(count)
 
-        self.training_buckets -= mean
-        self.training_buckets /= variance ** 0.5
-        self.test_buckets -= mean
-        self.test_buckets /= variance ** 0.5
+        self.training_data -= mean
+        self.training_data /= variance ** 0.5
+        self.test_data -= mean
+        self.test_data /= variance ** 0.5
 
     def load_data(self, data_set, frame_width, frame_jump):
         self.classes = dict()
-        self.training_buckets = []
-        self.test_buckets = []
+        self.training_data = []
+        self.test_data = []
         for x in os.listdir(data_set):
             if not os.path.isdir(data_set + '/' + x):
                 continue
@@ -176,6 +182,33 @@ class SoundClassifier(object):
             self.test_buckets.append(np.array(new_data[:test_data_count]))
         self.training_buckets = np.array(self.training_buckets)
         self.test_buckets = np.array(self.test_buckets)
+
+    def load_data(self, data_set, frame_width, frame_jump):
+        self.load_classes(data_set)
+        self.training_data = []
+        self.test_data = []
+        for x in os.listdir(data_set):
+            if ".wav" in x.lower():
+                new_data = SoundClassifier.load_examples(data_set + "/" + x, frame_width, frame_jump)
+                new_data = self.build_data_points(new_data, x)
+                random.shuffle(new_data)
+                test_data_count = int(len(new_data) * self.test_ratio)
+                self.training_data.extend(np.array(new_data[test_data_count:]))
+                self.test_data.extend(np.array(new_data[:test_data_count]))
+        self.training_data = np.array(self.training_data)
+        self.test_data = np.array(self.test_data)
+
+    def build_data_points(self, data_inputs, file_name):
+        target = np.zeros(len(self.classes))
+        for x in file_name.split("-")[:-1]:
+            target[self.classes[x]] = 1
+        return [DataPoint(x, target) for x in data_inputs]
+
+    def load_classes(self, data_set):
+        self.classes = dict()
+        f = open(data_set + "/Classes.txt")
+        for x in f:
+            self.classes[x] = len(self.classes)
 
     @staticmethod
     def load_examples(path, frame_width, frame_jump):
