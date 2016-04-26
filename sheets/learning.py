@@ -119,30 +119,28 @@ class SoundClassifier(object):
         self.load_data(data_set, frame_width, frame_jump)
         self.standardize_data()
 
-        self.model = ReluNetwork((frame_width, int(frame_width / 5), self.training_buckets.shape[0]), rate = 0.0001)
+        print(len(self.classes))
+        self.model = ReluNetwork((frame_width, int(frame_width / 5), len(self.classes)), rate = 0.0001)
 
     def train(self, batch_size = 1):
         input_list = []
         target_list = []
         for x in range(batch_size):
-            class_index = random.randrange(0, self.training_buckets.shape[0])
-            target_array = np.zeros(self.training_buckets.shape[0])
-            target_array[class_index] = 1
-            example_data = self.training_buckets[class_index][random.randrange(0, self.training_buckets[class_index].shape[0])]
-            input_list.append(example_data)
-            target_list.append(target_array)
+            example_data = random.choice(self.training_data)
+            input_list.append(example_data.inputs)
+            target_list.append(example_data.targets)
 
         self.model.train_backprop_batch(input_list, target_list)
 
     def accuracy_ratio(self):
         correct = 0
         incorrect = 0
-        for target_class in range(self.test_data.shape[0]):
-            for example_data in self.test_data[target_class]:
-                if np.argmax(self.model.calculate(example_data)) == target_class:
-                    correct += 1
-                else:
-                    incorrect += 1
+        for example_data in self.test_data:
+            output = self.threshold_vector(self.model.calculate(example_data.inputs))
+            if np.all(output == example_data.targets):
+                correct += 1
+            else:
+                incorrect += 1
         return correct / float(correct + incorrect)
 
     def standardize_data(self):
@@ -158,30 +156,8 @@ class SoundClassifier(object):
             variance += ((x.inputs - mean) ** 2).sum()
         variance /= float(count)
 
-        self.training_data -= mean
-        self.training_data /= variance ** 0.5
-        self.test_data -= mean
-        self.test_data /= variance ** 0.5
-
-    def load_data(self, data_set, frame_width, frame_jump):
-        self.classes = dict()
-        self.training_data = []
-        self.test_data = []
-        for x in os.listdir(data_set):
-            if not os.path.isdir(data_set + '/' + x):
-                continue
-
-            self.classes[x] = len(self.classes)
-            new_data = []
-            for y in os.listdir(data_set + '/' + x):
-                new_data.extend(SoundClassifier.load_examples(data_set + '/' + x + '/' + y, frame_width, frame_jump))
-            
-            random.shuffle(new_data)
-            test_data_count = int(len(new_data) * self.test_ratio)
-            self.training_buckets.append(np.array(new_data[test_data_count:]))
-            self.test_buckets.append(np.array(new_data[:test_data_count]))
-        self.training_buckets = np.array(self.training_buckets)
-        self.test_buckets = np.array(self.test_buckets)
+        self.training_data = np.array([DataPoint((x.inputs - mean) / (variance ** 0.5), x.targets) for x in self.training_data])
+        self.test_data = np.array([DataPoint((x.inputs - mean) / (variance ** 0.5), x.targets) for x in self.test_data])
 
     def load_data(self, data_set, frame_width, frame_jump):
         self.load_classes(data_set)
@@ -208,7 +184,12 @@ class SoundClassifier(object):
         self.classes = dict()
         f = open(data_set + "/Classes.txt")
         for x in f:
-            self.classes[x] = len(self.classes)
+            self.classes[x.replace("\n", "")] = len(self.classes)
+
+    def threshold_vector(self, v):
+        v[np.where(v >= self.confidence_threshold)] = 1
+        v[np.where(v < self.confidence_threshold)] = 0
+        return v
 
     @staticmethod
     def load_examples(path, frame_width, frame_jump):
