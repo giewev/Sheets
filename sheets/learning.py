@@ -133,7 +133,7 @@ class SoundClassifier(object):
         self.load_data(data_set, frame_width, frame_jump)
         self.standardize_data()
 
-        self.model = ReluNetwork((frame_width, int(frame_width / 5), len(self.classes)), rate = 0.0001)
+        self.model = LogisticNetwork((frame_width, int(frame_width / 5), len(self.classes)), rate = 0.0001)
 
     def train(self, batch_size = 1):
         input_list = []
@@ -169,8 +169,13 @@ class SoundClassifier(object):
             variance += ((x.inputs - mean) ** 2).sum()
         variance /= float(count)
 
-        self.training_data = np.array([DataPoint((x.inputs - mean) / (variance ** 0.5), x.targets) for x in self.training_data])
-        self.test_data = np.array([DataPoint((x.inputs - mean) / (variance ** 0.5), x.targets) for x in self.test_data])
+        for x in range(len(self.training_data)):
+            self.training_data[x] = DataPoint((self.training_data[x].inputs - mean) / (variance ** 0.5), self.training_data[x].targets)
+        self.training_data = np.array(self.training_data)
+
+        for x in range(len(self.test_data)):
+            self.test_data[x] = DataPoint((self.test_data[x].inputs - mean) / (variance ** 0.5), self.test_data[x].targets)
+        self.test_data = np.array(self.test_data)
 
     def load_data(self, data_set, frame_width, frame_jump):
         self.load_classes(data_set)
@@ -208,10 +213,18 @@ class SoundClassifier(object):
     def load_examples(path, frame_width, frame_jump):
         examples = []
         sample_rate, waveform = wavfile.read(path)
-        for channel_index in range(waveform.shape[1]):
-            channel = waveform[:, channel_index]
+        if len(waveform.shape) == 1:
+            channel = waveform
             index = 0
             while index + frame_width < len(channel):
                 examples.append(channel[index : index + frame_width])
                 index += frame_jump
+        else:
+            for channel_index in range(waveform.shape[1]):
+                channel = waveform[:, channel_index]
+                index = 0
+                while index + frame_width < len(channel):
+                    examples.append(channel[index : index + frame_width])
+                    index += frame_jump
+        del waveform
         return examples
